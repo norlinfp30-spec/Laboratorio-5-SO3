@@ -18,4 +18,4 @@ Practica 3: Cluster de Alta Disponibilidad HTTP
 • Implementar HA en los servidores utilizando KeepAlived. Validar la Alta Disponibilidad del servicio apagando uno de los servidores y y accediendo al servicio de apache a traves de un navegador.
 
 Este es el enlace a la lista de reproduccion en youtube: ↓
-https://www.youtube.com/playlist?list=PLpcZGYtY2vZYPoMvB_hnPMLPHWV2TgX3W
+https://www.youtube.com/playlist?list=PLpcZGYtY2vZbAxJMAYxP0SjCJnB47vVLQ
