@@ -1,0 +1,126 @@
+ PRACTICA 1 - RSYNC + CRONTAB
+
+OBJETIVO: Sincronizar automaticamente archivos entre Server 1 y Server 2
+cada 1 minuto.
+
+SERVER 1 (192.168.0.199) 
+
+Crear carpeta con 100 archivos de prueba
+
+mkdir ~/arch cd ~/arch touch arch{1..100}.txt ls cd
+
+Sincronizacion manual inicial
+
+rsync -avz /home/nolberto/arch/
+nolberto@192.168.0.198:/home/nolberto/Documents
+
+Crear script automatico
+
+nano /home/nolberto/sync.sh
+
+Contenido del script:
+
+#!/bin/bash /usr/bin/rsync -avz /home/nolberto/arch/
+nolberto@192.168.0.198:/home/nolberto/Documents >>
+/home/nolberto/rsync.log 2>&1
+
+Dar permisos
+
+chmod +x /home/nolberto/sync.sh
+
+Programar en crontab cada 1 minuto
+
+crontab -e
+
+Agregar: * * * * * /bin/bash /home/nolberto/sync.sh
+
+Verificar
+
+crontab -l
+
+SERVER 2 (192.168.0.198) 
+
+cd ~/Documents ls
+
+ PRACTICA 2 - CLUSTER HA (PCS)
+
+
+OBJETIVO: Implementar cluster de alta disponibilidad con Pacemaker y
+Corosync.
+
+—- EN AMBOS SERVIDORES —-
+
+sudo dnf install pcs pacemaker corosync -y sudo systemctl enable pcsd
+sudo systemctl start pcsd sudo passwd hacluster
+
+—- DESDE SERVER 1 —-
+
+sudo pcs host auth 192.168.0.199 192.168.0.198 -u hacluster -p
+TU_PASSWORD sudo pcs cluster setup mi_cluster 192.168.0.199
+192.168.0.198 –force sudo pcs cluster enable –all sudo pcs cluster start
+–all sudo pcs status
+
+Crear IP Virtual del cluster
+
+sudo pcs resource create VIP ocf:heartbeat:IPaddr2 ip=192.168.0.210
+cidr_netmask=24 op monitor interval=5s
+
+Desactivar stonith (solo laboratorio)
+
+sudo pcs property set stonith-enabled=false sudo pcs status
+
+Probar IP virtual
+
+ping 192.168.0.210
+
+Simular falla
+
+nmcli con down ens160 sudo pcs status
+
+============================== PRACTICA 3 - KEEPALIVED (VRRP)
+==============================
+
+OBJETIVO: Implementar alta disponibilidad con IP virtual usando VRRP.
+
+—- EN AMBOS SERVIDORES —-
+
+sudo dnf install keepalived -y
+
+Editar: sudo nano /etc/keepalived/keepalived.conf
+
+—- SERVER 1 (MASTER) —-
+
+global_defs { router_id SERVER1 }
+
+vrrp_instance VI_1 { state MASTER interface ens160 virtual_router_id 51
+priority 100 advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+
+    virtual_ipaddress {
+        192.168.0.220/24
+    }
+
+}
+
+SERVER 2 (BACKUP)
+
+Cambiar: router_id SERVER2 state BACKUP priority 90
+
+FINALIZAR
+
+sudo firewall-cmd –zone=public –add-protocol=vrrp –permanent sudo
+firewall-cmd –reload sudo systemctl enable keepalived sudo systemctl
+start keepalived
+
+Verificar IP virtual
+
+ip a ping 192.168.0.220
+
+Simular falla
+
+nmcli con down ens160 nmcli con up ens160
+
