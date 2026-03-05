@@ -1,46 +1,46 @@
- PRACTICA 1 - RSYNC + CRONTAB
+🎥 PRACTICA 1 – Sincronización con Rsync
+# Primero instalo rsync en ambos servidores
+sudo dnf install rsync -y
 
-OBJETIVO: Sincronizar automaticamente archivos entre Server 1 y Server 2
-cada 1 minuto.
+# En el servidor principal (192.168.0.199) creo la carpeta a sincronizar
+mkdir /home/nolberto/syncfolder
+cd /home/nolberto/syncfolder
 
-SERVER 1 (192.168.0.199) 
+# Creo 100 archivos de prueba
+for i in {1..100}; do touch file$i.txt; done
 
-Crear carpeta con 100 archivos de prueba
+# Verifico que los 100 archivos fueron creados
+ls | wc -l
 
-mkdir ~/arch cd ~/arch touch arch{1..100}.txt ls cd
+# Genero clave SSH para conexión sin contraseña
+ssh-keygen
 
-Sincronizacion manual inicial
+# Copio la clave al servidor secundario (192.168.0.198)
+ssh-copy-id nolberto@192.168.0.198
 
-rsync -avz /home/nolberto/arch/
-nolberto@192.168.0.198:/home/nolberto/Documents
+# Realizo una sincronización manual de prueba
+rsync -avz /home/nolberto/syncfolder/ nolberto@192.168.0.200:/home/nolberto/syncfolder/
 
-Crear script automatico
-
+# Creo un script para automatizar la sincronización
 nano /home/nolberto/sync.sh
 
 Contenido del script:
 
-#!/bin/bash /usr/bin/rsync -avz /home/nolberto/arch/
-nolberto@192.168.0.198:/home/nolberto/Documents >>
-/home/nolberto/rsync.log 2>&1
-
-Dar permisos
-
+#!/bin/bash
+rsync -avz /home/nolberto/syncfolder/ nolberto@192.168.0.198:/home/nolberto/syncfolder/
+# Doy permisos de ejecución
 chmod +x /home/nolberto/sync.sh
 
-Programar en crontab cada 1 minuto
-
+# Programo el cron para que se ejecute cada minuto
 crontab -e
 
-Agregar: * * * * * /bin/bash /home/nolberto/sync.sh
+Agregar:
 
-Verificar
+* * * * * /home/nolberto/sync.sh
+# Creo un archivo nuevo para probar el cron
+touch /home/nolberto/syncfolder/prueba_cron.txt
 
-crontab -l
-
-SERVER 2 (192.168.0.198) 
-
-cd ~/Documents ls
+Después de 1 minuto verificas en 192.168.0.198.
 
  PRACTICA 2 - CLUSTER HA (PCS)
 
