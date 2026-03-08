@@ -42,43 +42,147 @@ touch /home/nolberto/syncfolder/prueba_cron.txt
 
 Después de 1 minuto verificas en 192.168.0.198.
 
- PRACTICA 2 - CLUSTER HA (PCS)
+Practica 2
 
+5. Instalar paquetes del cluster
 
-OBJETIVO: Implementar cluster de alta disponibilidad con Pacemaker y
-Corosync.
+En los dos servidores
 
-—- EN AMBOS SERVIDORES —-
+sudo dnf install pcs pacemaker corosync resource-agents -y
+6. Activar el servicio pcsd
 
-sudo dnf install pcs pacemaker corosync -y sudo systemctl enable pcsd
-sudo systemctl start pcsd sudo passwd hacluster
+En los dos servidores
 
-—- DESDE SERVER 1 —-
+sudo systemctl enable pcsd --now
 
-sudo pcs host auth 192.168.0.199 192.168.0.198 -u hacluster -p
-TU_PASSWORD sudo pcs cluster setup mi_cluster 192.168.0.199
-192.168.0.198 –force sudo pcs cluster enable –all sudo pcs cluster start
-–all sudo pcs status
+Verificar:
 
-Crear IP Virtual del cluster
+systemctl status pcsd
 
-sudo pcs resource create VIP ocf:heartbeat:IPaddr2 ip=192.168.0.210
-cidr_netmask=24 op monitor interval=5s
+Debe decir active (running).
 
-Desactivar stonith (solo laboratorio)
+7. Configurar contraseña del usuario del cluster
 
-sudo pcs property set stonith-enabled=false sudo pcs status
+Pacemaker usa el usuario hacluster.
 
-Probar IP virtual
+En los dos servidores
 
-ping 192.168.0.210
+sudo passwd hacluster
 
-Simular falla
+Pon la misma contraseña en ambos.
+
+Ejemplo:
+
+cluster123
+8. Autenticar los nodos
+
+Desde server1
+
+sudo pcs host auth server1 server2 -u hacluster
+
+Escribe la contraseña que pusiste.
+
+Debe mostrar algo como:
+
+server1: Authorized
+server2: Authorized
+9. Crear el cluster
+
+Desde server1
+
+sudo pcs cluster setup mycluster server1 server2
+10. Iniciar el cluster
+
+Desde server1
+
+sudo pcs cluster start --all
+
+Habilitar que inicie siempre:
+
+sudo pcs cluster enable --all
+11. Verificar estado
+pcs status
+
+Debe mostrar:
+
+2 nodes configured
+2 nodes online
+12. Desactivar STONITH (importante en máquinas virtuales)
+sudo pcs property set stonith-enabled=false
+13. Ignorar quorum (solo para laboratorio)
+sudo pcs property set no-quorum-policy=ignore
+14. Crear la IP flotante
+
+Desde server1
+
+sudo pcs resource create VirtualIP ocf:heartbeat:IPaddr2 ip=192.168.0.200 cidr_netmask=24 op monitor interval=30s
+15. Verificar recurso
+pcs status
+
+Debe mostrar algo como:
+
+VirtualIP (ocf::heartbeat:IPaddr2): Started server1
+16. Verificar la IP flotante
+
+En cualquiera de los servidores:
+
+ip a
+
+Debe aparecer:
+
+192.168.0.200
+17. Prueba para el video
+
+Desde tu computadora host (Windows) abre CMD:
+
+ping 192.168.0.200
+
+Debe responder.
+
+18. Prueba de alta disponibilidad
+
+Mientras el ping está corriendo.
+
+En server1
 
 sudo reboot
 
-============================== PRACTICA 3 - KEEPALIVED (VRRP)
-==============================
+La IP flotante pasará automáticamente a server2.
+
+El ping debe mantenerse.
+
+19. Segunda prueba
+
+Cuando server1 vuelva a iniciar.
+
+Reinicia server2
+
+sudo reboot
+
+La IP flotante volverá a server1.
+
+Comandos que debes mostrar en el video
+
+Mostrar estado del cluster:
+
+pcs status
+
+Mostrar nodos:
+
+pcs cluster status
+
+Mostrar recursos:
+
+pcs resource show
+
+Mostrar IP:
+
+ip a
+
+
+
+PRACTICA 3 - KEEPALIVED (VRRP)
+
 
 OBJETIVO: Implementar alta disponibilidad con IP virtual usando VRRP.
 
