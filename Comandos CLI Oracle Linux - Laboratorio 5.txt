@@ -75,7 +75,7 @@ ping 192.168.0.210
 
 Simular falla
 
-nmcli con down ens160 sudo pcs status
+sudo reboot
 
 ============================== PRACTICA 3 - KEEPALIVED (VRRP)
 ==============================
