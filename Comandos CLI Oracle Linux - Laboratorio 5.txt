@@ -180,24 +180,56 @@ Mostrar IP:
 ip a
 
 
+Practica 3
+El navegador accederá siempre a:
 
-PRACTICA 3 - KEEPALIVED (VRRP)
+http://192.168.0.200
+1️⃣ Instalar paquetes (en los DOS servidores)
+sudo dnf install httpd keepalived -y
 
+Activar Apache:
 
-OBJETIVO: Implementar alta disponibilidad con IP virtual usando VRRP.
+sudo systemctl enable --now httpd
 
-—- EN AMBOS SERVIDORES —-
+Verificar:
 
-sudo dnf install keepalived -y
+systemctl status httpd
+2️⃣ Crear la página web de cada servidor
+Server1
+sudo nano /var/www/html/index.html
 
-Editar: sudo nano /etc/keepalived/keepalived.conf
+Contenido:
 
-—- SERVER 1 (MASTER) —-
+<h1>SERVER 1 - ACTIVO</h1>
+Server2
+sudo nano /var/www/html/index.html
 
-global_defs { router_id SERVER1 }
+Contenido:
 
-vrrp_instance VI_1 { state MASTER interface ens160 virtual_router_id 51
-priority 100 advert_int 1
+<h1>SERVER 2 - ACTIVO</h1>
+3️⃣ Abrir firewall
+
+En los dos servidores:
+
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=high-availability
+sudo firewall-cmd --reload
+4️⃣ Configurar Keepalived
+
+Archivo:
+
+/etc/keepalived/keepalived.conf
+SERVER1 (MASTER)
+sudo nano /etc/keepalived/keepalived.conf
+
+Config:
+
+vrrp_instance VI_1 {
+    state MASTER
+    interface enp0s3
+    virtual_router_id 51
+    priority 101
+    advert_int 1
 
     authentication {
         auth_type PASS
@@ -205,26 +237,75 @@ priority 100 advert_int 1
     }
 
     virtual_ipaddress {
-        192.168.0.220/24
+        192.168.0.200
+    }
+}
+SERVER2 (BACKUP)
+sudo nano /etc/keepalived/keepalived.conf
+
+Config:
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface enp0s3
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass 1234
     }
 
+    virtual_ipaddress {
+        192.168.0.200
+    }
 }
 
-SERVER 2 (BACKUP)
+⚠️ La interfaz debe ser la correcta.
+Verifícala con:
 
-Cambiar: router_id SERVER2 state BACKUP priority 90
+ip a
 
-FINALIZAR
+(en muchas máquinas de **Oracle Linux es ens33, enp0s3 o eth0).
 
-sudo firewall-cmd –zone=public –add-protocol=vrrp –permanent sudo
-firewall-cmd –reload sudo systemctl enable keepalived sudo systemctl
-start keepalived
+5️⃣ Iniciar Keepalived
 
-Verificar IP virtual
+En los dos servidores:
 
-ip a ping 192.168.0.220
+sudo systemctl enable --now keepalived
 
-Simular falla
+Verificar:
 
-nmcli con down ens160 nmcli con up ens160
+systemctl status keepalived
+6️⃣ Ver la IP virtual
 
+En server1:
+
+ip a
+
+Debe aparecer:
+
+192.168.0.200
+7️⃣ Probar desde navegador
+
+En tu PC abre:
+
+http://192.168.0.200
+
+Debe mostrar:
+
+SERVER 1 - ACTIVO
+8️⃣ Probar Alta Disponibilidad
+
+Apaga server1:
+
+sudo poweroff
+
+Ahora entra otra vez:
+
+http://192.168.0.200
+
+Ahora verás:
+
+SERVER 2 - ACTIVO
