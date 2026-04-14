@@ -1,4 +1,4 @@
-🎥 PRACTICA 1 – Sincronización con Rsync
+ PRACTICA 1 – Sincronización con Rsync
 # Primero instalo rsync en ambos servidores
 sudo dnf install rsync -y
 
@@ -19,7 +19,7 @@ ssh-keygen
 ssh-copy-id nolberto@192.168.0.198
 
 # Realizo una sincronización manual de prueba
-rsync -avz /home/nolberto/syncfolder/ nolberto@192.168.0.200:/home/nolberto/syncfolder/
+rsync -avz /home/nolberto/syncfolder/ nolberto@192.168.0.198:/home/nolberto/syncfolder/
 
 # Creo un script para automatizar la sincronización
 nano /home/nolberto/sync.sh
