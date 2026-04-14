@@ -42,274 +42,179 @@ touch /home/nolberto/syncfolder/prueba_cron.txt
 
 Después de 1 minuto verificas en 192.168.0.198.
 
-Practica 2
+¡Entendido, Nolberto! No te preocupes, yo tomo el relevo desde aquí. El error que viste es común en Oracle Linux, ya que los paquetes de Alta Disponibilidad (HA) están en un repositorio que viene desactivado por defecto.
 
-5. Instalar paquetes del cluster
+Aquí tienes la guía completa y corregida, integrando la solución de los repositorios para que solo tengas que copiar y pegar.
 
-En los dos servidores
+Práctica 2 — Cluster de Alta Disponibilidad
 
-sudo dnf install pcs pacemaker corosync resource-agents -y
-6. Activar el servicio pcsd
+DATOS DEL CLUSTER
+Nodo 1: m20252263 (192.168.0.199)
 
-En los dos servidores
+Nodo 2: vm20252263 (192.168.0.198)
 
-sudo systemctl enable pcsd --now
+IP Flotante: 192.168.0.200
 
-Verificar:
+Password hacluster: Norlin123n
 
-systemctl status pcsd
+PASO 1 — EN AMBOS NODOS: Habilitar Repositorios y Hostname
+Copia y pega esto en ambos nodos para activar los paquetes de High Availability:
 
-Debe decir active (running).
+Bash
+# Configurar hostname según el nodo (Asegúrate de estar en el correcto)
+# En Nodo 1 usa: sudo hostnamectl set-hostname m20252263
+# En Nodo 2 usa: sudo hostnamectl set-hostname vm20252263
+exec bash
 
-7. Configurar contraseña del usuario del cluster
+# Habilitar repositorios de Oracle Linux para HA
+sudo dnf install -y oracle-epel-release-el9
+sudo dnf config-manager --enable ol9_addons ol9_appstream ol9_baseos_latest
+PASO 2 — EN AMBOS NODOS: Instalación de Paquetes
+Ahora que los repos están activos, instala las herramientas del cluster:
 
-Pacemaker usa el usuario hacluster.
+Bash
+sudo dnf install -y pacemaker corosync pcs fence-agents-all
+PASO 3 — EN AMBOS NODOS: Configuración de Red y Seguridad
+Preparamos el entorno para que los nodos se comuniquen sin bloqueos:
 
-En los dos servidores
+Bash
+# Agregar hosts
+sudo bash -c 'cat >> /etc/hosts << EOF
+192.168.0.199  m20252263
+192.168.0.198  vm20252263
+EOF'
 
-sudo passwd hacluster
+# Deshabilitar Firewall y SELinux (necesario para laboratorios de Redes)
+sudo systemctl disable --now firewalld
+sudo setenforce 0
+sudo sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
 
-Pon la misma contraseña en ambos.
+# Activar el servicio de configuración del cluster
+sudo systemctl enable --now pcsd
+PASO 4 — EN AMBOS NODOS: Contraseña de Cluster
+Establece la contraseña para el usuario del sistema que gestiona el cluster:
 
-Ejemplo:
+Bash
+echo "Norlin123n" | sudo passwd --stdin hacluster
+PASO 5 — SOLO EN EL NODO 1 (m20252263): Crear el Cluster
+Ejecuta esto solo desde tu primer nodo para unir a ambos:
 
-cluster123
-8. Autenticar los nodos
+Bash
+# 1. Autenticar nodos
+sudo pcs host auth m20252263 vm20252263 -u hacluster -p Norlin123n
 
-Desde server1
-
-sudo pcs host auth server1 server2 -u hacluster
-
-Escribe la contraseña que pusiste.
-
-Debe mostrar algo como:
-
-server1: Authorized
-server2: Authorized
-9. Crear el cluster
-
-Desde server1
-
-sudo pcs cluster setup mycluster server1 server2
-10. Iniciar el cluster
-
-Desde server1
-
+# 2. Configurar y arrancar el cluster
+sudo pcs cluster setup practica2 m20252263 vm20252263 --force
 sudo pcs cluster start --all
-
-Habilitar que inicie siempre:
-
 sudo pcs cluster enable --all
-11. Verificar estado
-pcs status
 
-Debe mostrar:
-
-2 nodes configured
-2 nodes online
-12. Desactivar STONITH (importante en máquinas virtuales)
+# 3. Configuraciones globales (Importante: STONITH se desactiva si no tienes hardware de esgrima)
 sudo pcs property set stonith-enabled=false
-13. Ignorar quorum (solo para laboratorio)
-sudo pcs property set no-quorum-policy=ignore
-14. Crear la IP flotante
+PASO 6 — SOLO EN EL NODO 1: Crear la IP Flotante
+Este es el recurso que "brincará" de un nodo a otro si uno falla:
 
-Desde server1
+Bash
+sudo pcs resource create virtual_ip \
+  ocf:heartbeat:IPaddr2 \
+  ip=192.168.0.200 \
+  cidr_netmask=24 \
+  nic=eth0 \
+  op monitor interval=10s
+PASO 7 — VERIFICACIÓN Y PRUEBAS
+Para confirmar que todo funciona, usa:
 
-sudo pcs resource create VirtualIP ocf:heartbeat:IPaddr2 ip=192.168.0.200 cidr_netmask=24 op monitor interval=30s
-15. Verificar recurso
-pcs status
+Bash
+sudo pcs status
+Para probar el Failover:
 
-Debe mostrar algo como:
+En tu Windows abre una terminal y deja corriendo un ping -t 192.168.0.200.
 
-VirtualIP (ocf::heartbeat:IPaddr2): Started server1
-16. Verificar la IP flotante
+En el Nodo 1, ejecuta: sudo pcs node standby m20252263.
 
-En cualquiera de los servidores:
+Verás que el ping se pierde un segundo y vuelve, porque el Nodo 2 tomó la IP.
 
-ip a
-
-Debe aparecer:
-
-192.168.0.200
-17. Prueba para el video
-
-Desde tu computadora host (Windows) abre CMD:
-
-ping 192.168.0.200
-
-Debe responder.
-
-18. Prueba de alta disponibilidad
-
-Mientras el ping está corriendo.
-
-En server1
-
-sudo reboot
-
-La IP flotante pasará automáticamente a server2.
-
-El ping debe mantenerse.
-
-19. Segunda prueba
-
-Cuando server1 vuelva a iniciar.
-
-Reinicia server2
-
-sudo reboot
-
-La IP flotante volverá a server1.
-
-Comandos que debes mostrar en el video
-
-Mostrar estado del cluster:
-
-pcs status
-
-Mostrar nodos:
-
-pcs cluster status
-
-Mostrar recursos:
-
-pcs resource show
-
-Mostrar IP:
-
-ip a
+Para regresar a la normalidad: sudo pcs node unstandby m20252263.
 
 
-Practica 3
-El navegador accederá siempre a:
+🚀 PRÁCTICA 3: CLUSTER HTTP CON KEEPALIVED
+DATOS DEL ESCENARIO
+Nodo 1 (Master): m20252263 (192.168.0.199)
 
-http://192.168.0.200
-1️⃣ Instalar paquetes (en los DOS servidores)
-sudo dnf install httpd keepalived -y
+Nodo 2 (Backup): vm20252263 (192.168.0.198)
 
-Activar Apache:
+Virtual IP (VIP): 192.168.0.210 (Usaremos la .210 para no chocar con la práctica anterior)
 
+Interfaz: eth0
+
+PASO 1 — EN AMBOS NODOS: Instalar Apache y Keepalived
+Bash
+# Instalar los servicios
+sudo dnf install -y httpd keepalived
+
+# Habilitar e iniciar Apache
 sudo systemctl enable --now httpd
+PASO 2 — DIFERENCIAR LOS SERVIDORES (Página HTML)
+Ejecuta esto en el Nodo 1 (m20252263):
 
-Verificar:
+Bash
+echo "<h1>Bienvenido a SERVER 1 - m20252263</h1>" | sudo tee /var/www/html/index.html
+Ejecuta esto en el Nodo 2 (vm20252263):
 
-systemctl status httpd
-2️⃣ Crear la página web de cada servidor
-Server1
-sudo nano /var/www/html/index.html
+Bash
+echo "<h1>Bienvenido a SERVER 2 - vm20252263</h1>" | sudo tee /var/www/html/index.html
+PASO 3 — CONFIGURAR KEEPALIVED
+En el NODO 1 (Master):
+Borra todo el contenido de /etc/keepalived/keepalived.conf y pega esto:
 
-Contenido:
-
-<h1>SERVER 1 - ACTIVO</h1>
-Server2
-sudo nano /var/www/html/index.html
-
-Contenido:
-
-<h1>SERVER 2 - ACTIVO</h1>
-3️⃣ Abrir firewall
-
-En los dos servidores:
-
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=high-availability
-sudo firewall-cmd --reload
-4️⃣ Configurar Keepalived
-
-Archivo:
-
-/etc/keepalived/keepalived.conf
-SERVER1 (MASTER)
-sudo nano /etc/keepalived/keepalived.conf
-
-Config:
-
-vrrp_instance VI_1 {
-    state MASTER
-    interface enp0s3
-    virtual_router_id 51
-    priority 101
-    advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass 1234
-    }
-
-    virtual_ipaddress {
-        192.168.0.200
-    }
-}
-SERVER2 (BACKUP)
-sudo nano /etc/keepalived/keepalived.conf
-
-Config:
-
-global_defs {
-   notification_email_from admin@itla.edu.do
-}
-
+Bash
+sudo bash -c 'cat > /etc/keepalived/keepalived.conf << EOF
 vrrp_instance VI_1 {
     state MASTER
     interface eth0
     virtual_router_id 51
-    priority 101
+    priority 100
     advert_int 1
-    
-    unicast_src_ip 192.168.0.199
-    unicast_peer {
-        192.168.0.198
+    authentication {
+        auth_type PASS
+        auth_pass Norlin123n
     }
-
     virtual_ipaddress {
-        192.168.0.200/24
+        192.168.0.210
     }
 }
+EOF'
+En el NODO 2 (Backup):
+Borra todo el contenido de /etc/keepalived/keepalived.conf y pega esto:
 
-⚠️ La interfaz debe ser la correcta.
-Verifícala con:
+Bash
+sudo bash -c 'cat > /etc/keepalived/keepalived.conf << EOF
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    virtual_router_id 51
+    priority 90
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass Norlin123n
+    }
+    virtual_ipaddress {
+        192.168.0.210
+    }
+}
+EOF'
+PASO 4 — INICIAR EL SERVICIO
+Ejecuta esto en ambos nodos:
 
-ip a
-
-(en muchas máquinas de **Oracle Linux es ens33, enp0s3 o eth0).
-
-5️⃣ Iniciar Keepalived
-
-En los dos servidores:
-
+Bash
 sudo systemctl enable --now keepalived
+PASO 5 — VALIDACIÓN (La prueba del examen)
+Verificar la IP: Ejecuta ip add show eth0 en el Nodo 1. Deberías ver la IP 192.168.0.210 asignada.
 
-Verificar:
+Navegador: Desde tu PC real (Windows), abre el navegador y entra a http://192.168.0.210. Debería decir: "SERVER 1".
 
-systemctl status keepalived
-6️⃣ Ver la IP virtual
+Simular Falla: Apaga el Nodo 1 o detén el servicio:
 
-En server1:
-
-ip a
-
-Debe aparecer:
-
-192.168.0.200
-7️⃣ Probar desde navegador
-
-En tu PC abre:
-
-http://192.168.0.200
-
-Debe mostrar:
-
-SERVER 1 - ACTIVO
-8️⃣ Probar Alta Disponibilidad
-
-Apaga server1:
-
-sudo poweroff
-
-Ahora entra otra vez:
-
-http://192.168.0.200
-
-Ahora verás:
-
-SERVER 2 - ACTIVO
+Bash
+sudo systemctl stop keepalived
+Refrescar Navegador: Entra otra vez a http://192.168.0.210. Ahora debería decir: "SERVER 2".
